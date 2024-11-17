@@ -1,0 +1,97 @@
+---
+#title: "RWorksheet5(Laurente,Almayo,Ganon)"
+#author: "Karl Andrei Laurente, Josh Christian Almayo, Andrew Vinz Ganon
+#output: pdf_document
+---
+
+
+```{r}
+library(rvest)
+library(polite)
+library(dplyr)
+library(httr)
+library(stringr)
+```
+
+```{r}
+polite::use_manners(save_as = "polite_scrape_tvshows.R")
+url <- "https://www.imdb.com/chart/toptv/?ref_=nv_tvv_250" 
+session <- bow(url, user_agent = "Educational")
+session
+```
+
+Show tv titles
+```{r}
+#Title
+title_list <- scrape(session) %>% html_nodes("h3.ipc-title__text") %>% html_text(trim = TRUE)
+#filter 
+```
+
+```{r}
+title_list <- title_list[!grepl("Recently viewed", title_list)]
+title_list
+```
+
+List of the Top 50 TV Shows
+```{r}
+class(title_list)
+listtitle <- as.data.frame(title_list[2:51])
+listtitle
+```
+
+Rank number and the TV Show title.
+```{r}
+colnames(listtitle) <- c("ranks")
+split_df <- strsplit(as.character(listtitle$ranks),".",fixed = TRUE)
+split_df <- data.frame(do.call(rbind,split_df))
+split_df <- split_df[-c(3:4)] 
+colnames(split_df) <- c("Ranks","Title") 
+str(split_df)
+```
+
+The Rank and the Title of the TV Shows
+```{r}
+class(split_df)
+split_df
+```
+
+Top 50 TV Show Rating
+```{r}
+rating <- scrape(session) %>% html_nodes("span.ipc-rating-star--rating") %>% html_text
+tv_rating <- as.data.frame(rating [1:50])
+tv_rating
+```
+Number of People who Voted
+```{r}
+tv_votes <- scrape(session) %>% html_nodes("span.ipc-rating-star--voteCount") %>% html_text
+total_tv_votes <- as.data.frame(tv_votes[1:50])
+total_tv_votes
+```
+Number of Episodes of each TV Shows
+```{r}
+episodes <- scrape(session) %>% html_nodes("span.sc-5bc66c50-6.OOdsw") %>% html_text
+cl_episodes <- gsub("\\D", "", episodes)
+cleaned_episodes <- str_extract(episodes, "\\d+(?=\\s*eps)")
+cleaned_episodes <- as.numeric(cleaned_episodes)
+cleaned_episodes <- cleaned_episodes[!is.na(cleaned_episodes)]
+cleaned_episodes <- as.data.frame(cleaned_episodes[1:25])
+cleaned_episodes
+```
+Year of TV Shows released
+```{r}
+tv_years <- scrape(session) %>% html_nodes("span.sc-5bc66c50-6.OOdsw") %>% html_text
+clyear <- gsub(".*?(\\d{4}(-\\d{4})?).*", "\\1", tv_years)
+yeartv <- str_extract(tv_years, "\\b\\d{4}(-\\d{4})?\\b")
+yeartv <- as.numeric(yeartv)
+yeartv <- yeartv[!is.na(yeartv)]
+tv_year_of_air <- as.data.frame(yeartv[1:25])
+tv_year_of_air
+```
+
+Data frame of TV Shows
+```{r}
+final_data <- cbind(split_df,tv_rating,cleaned_episodes,tv_year_of_air)
+colnames(final_data) <- c("Ranks", "TV Rating", "Number of Votes", "Number of Episodes", "Year Released")
+final_data
+```
+
