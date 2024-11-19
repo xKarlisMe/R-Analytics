@@ -4,94 +4,157 @@
 #output: pdf_document
 ---
 
-
-```{r}
-library(rvest)
+```{r eval=FALSE, include=FALSE}
 library(polite)
-library(dplyr)
 library(httr)
+library(rvest)
+library(dplyr)
 library(stringr)
+library(magrittr)
+
+install.packages("ggplot2")
+library(ggplot2)
 ```
 
 ```{r}
-polite::use_manners(save_as = "polite_scrape_tvshows.R")
-url <- "https://www.imdb.com/chart/toptv/?ref_=nv_tvv_250" 
-session <- bow(url, user_agent = "Educational")
-session
+#4.) 
+urls <- c('https://www.amazon.com/s?i=specialty-aps&bbn=16225009011&rh=n%3A%2116225009011%2Cn%3A281407&ref=nav_em__nav_desktop_sa_intl_accessories_and_supplies_0_2_5_2', 
+          'https://www.amazon.com/s?i=specialty-aps&bbn=16225009011&rh=n%3A%2116225009011%2Cn%3A502394&ref=nav_em__nav_desktop_sa_intl_camera_and_photo_0_2_5_3',
+          'https://www.amazon.com/s?i=specialty-aps&bbn=16225009011&rh=n%3A%2116225009011%2Cn%3A3248684011&ref=nav_em__nav_desktop_sa_intl_car_and_vehicle_electronics_0_2_5_4',
+          'https://www.amazon.com/s?i=specialty-aps&bbn=16225009011&rh=n%3A%2116225009011%2Cn%3A2811119011&ref=nav_em__nav_desktop_sa_intl_cell_phones_and_accessories_0_2_5_5',
+          'https://www.amazon.com/s?i=specialty-aps&bbn=16225009011&rh=n%3A%2116225009011%2Cn%3A541966&ref=nav_em__nav_desktop_sa_intl_computers_and_accessories_0_2_5_6')
 ```
 
-Show tv titles
+
 ```{r}
-#Title
-title_list <- scrape(session) %>% html_nodes("h3.ipc-title__text") %>% html_text(trim = TRUE)
-#filter 
+#5
+df <- list()
+
+for (i in seq_along(urls)) {
+  
+session <- bow(urls[i], user_agent = "Educational")
+  
+product_name <- scrape(session) %>%
+    html_nodes('h2.a-size-mini') %>% 
+    html_text() %>%
+    head(30) 
+
+product_price <- scrape(session) %>%
+    html_nodes('span.a-price') %>% 
+    html_text() %>%
+    head(30) 
+  
+price <- as.numeric(str_extract(product_price, "\\d+\\.\\d+"))
+
+product_description <- scrape(session) %>%
+    html_nodes('.a-spacing-mini:nth-child(1) .a-list-item') %>% 
+    html_text() %>%
+    head(30) 
+  
+product_rating <- scrape(session) %>%
+    html_nodes('span.a-icon-alt') %>% 
+    html_text() %>%
+    head(30)  
+  
+ratings <- as.numeric(str_extract(product_rating, "\\d+\\.\\d"))
+  
+product_review <- scrape(session) %>%
+    html_nodes('div.review-text-content') %>% 
+    html_text() %>%
+    head(30)  
+  
+Temporary_df <- data.frame(Product_Name = product_name[1:30],
+                       Description = product_description[1:30],
+                       Rating = ratings[1:30],
+                       Price = price[1:30],
+                       stringsAsFactors = FALSE)
+
+#colnames(Temporary_df) <- c("Product Name")
+  df[[i]] <- Temporary_df
+}
+
+print(df[[1]])
+print(df[[2]])
+print(df[[3]])
+print(df[[4]])
+print(df[[5]])
 ```
 
 ```{r}
-title_list <- title_list[!grepl("Recently viewed", title_list)]
-title_list
+#6. 
+#Our code scraped the first 30 elements of the product's name, price, description, ratings and reviews. There are a total of 5 categories and each containing 30 products so the product equal all in all 150 products. 
 ```
 
-List of the Top 50 TV Shows
 ```{r}
-class(title_list)
-listtitle <- as.data.frame(title_list[2:51])
-listtitle
+#7
+
+#The data we have collected can be used for a variety of purposes such as determining the top 30 products that appears when selecting a certain category. We can also determine the product's name, price, ratings, description, and reviews which can totally save a shopper's time by scrolling through each one. 
 ```
 
-Rank number and the TV Show title.
 ```{r}
-colnames(listtitle) <- c("ranks")
-split_df <- strsplit(as.character(listtitle$ranks),".",fixed = TRUE)
-split_df <- data.frame(do.call(rbind,split_df))
-split_df <- split_df[-c(3:4)] 
-colnames(split_df) <- c("Ranks","Title") 
-str(split_df)
+#8
+merged_df <- do.call(rbind, df)
+merged_df$Category <- rep(c("Accessories and Supplies", "Camera and Photo", "Car and Vehicle Electronics", "Cell Phones and Accessories", "Computers and Accessories"), each = 30)
+
+rating_average <- merged_df %>%
+  group_by(Category) %>%
+  summarize(Average_Ratings = mean(Rating, na.rm = TRUE))
+
+ggplot(rating_average, aes(x = Category, y = Average_Ratings, fill = Category)) + geom_bar(stat = "identity") + labs(title = "Bar Plot of Average Rating per Category", x = "Category", y = "Average Rating") + theme_minimal() 
+
+
+avg_price <- merged_df %>%
+  group_by(Category) %>%
+  summarize(Average_Price = mean(Price, na.rm = TRUE))
+
+ggplot(avg_price, aes(x = Category, y = Average_Price, fill = Category)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Bar Plot of Average Price per Category", x = "Category", y = "Average Price") +
+  theme_minimal()
+
+ggplot(merged_df, aes(x = Price, y = Rating, color = Category)) +
+  geom_point() +
+  labs(title = "Bar Plot of Price vs Rating of Categories", x = "Price", y = "Rating") +
+  theme_minimal()
 ```
 
-The Rank and the Title of the TV Shows
 ```{r}
-class(split_df)
-split_df
+#9
+ggplot(merged_df, aes(x = Category, y = Rating, fill = Category)) +
+  geom_boxplot() +
+  labs(title = "Distribution of Ratings by Category", x = "Category", y = "Rating") +
+  theme_minimal()
+
+ggplot(merged_df, aes(x = Category, y = Price, fill = Category)) +
+  geom_boxplot() +
+  labs(title = "Distribution of Prices by Category", x = "Category", y = "Price") +
+  theme_minimal()
 ```
 
-Top 50 TV Show Rating
 ```{r}
-rating <- scrape(session) %>% html_nodes("span.ipc-rating-star--rating") %>% html_text
-tv_rating <- as.data.frame(rating [1:50])
-tv_rating
-```
-Number of People who Voted
-```{r}
-tv_votes <- scrape(session) %>% html_nodes("span.ipc-rating-star--voteCount") %>% html_text
-total_tv_votes <- as.data.frame(tv_votes[1:50])
-total_tv_votes
-```
-Number of Episodes of each TV Shows
-```{r}
-episodes <- scrape(session) %>% html_nodes("span.sc-5bc66c50-6.OOdsw") %>% html_text
-cl_episodes <- gsub("\\D", "", episodes)
-cleaned_episodes <- str_extract(episodes, "\\d+(?=\\s*eps)")
-cleaned_episodes <- as.numeric(cleaned_episodes)
-cleaned_episodes <- cleaned_episodes[!is.na(cleaned_episodes)]
-cleaned_episodes <- as.data.frame(cleaned_episodes[1:25])
-cleaned_episodes
-```
-Year of TV Shows released
-```{r}
-tv_years <- scrape(session) %>% html_nodes("span.sc-5bc66c50-6.OOdsw") %>% html_text
-clyear <- gsub(".*?(\\d{4}(-\\d{4})?).*", "\\1", tv_years)
-yeartv <- str_extract(tv_years, "\\b\\d{4}(-\\d{4})?\\b")
-yeartv <- as.numeric(yeartv)
-yeartv <- yeartv[!is.na(yeartv)]
-tv_year_of_air <- as.data.frame(yeartv[1:25])
-tv_year_of_air
-```
+#10
+ranked_elements <- lapply(df, function(df_category) {
+  df_category %>%
+    arrange(desc(Rating), Price) %>%
+    mutate(Rank = row_number()) %>%
+    select(Rank, everything()) 
+})
 
-Data frame of TV Shows
-```{r}
-final_data <- cbind(split_df,tv_rating,cleaned_episodes,tv_year_of_air)
-colnames(final_data) <- c("Ranks", "TV Rating", "Number of Votes", "Number of Episodes", "Year Released")
-final_data
-```
+categories <- c("Accessories and Supplies", "Camera and Photo", "Car and Vehicle Electronics", "Cell Phones and Accessories", "Computers and Accessories")
 
+for (i in seq_along(ranked_elements)) {
+  ranked_elements[[i]]$Category <- categories[i]
+}
+
+arranged_merged_df <- do.call(rbind, ranked_elements)
+arranged_merged_df <- arranged_merged_df %>% 
+  arrange(Category, Rank) %>% 
+  group_by(Category) %>% 
+  select(Rank, Category, everything()) %>%
+  slice(1:5) 
+
+
+colnames(arranged_merged_df) <- c("Rank", "Category", "Product Name", "Product Description", "Rating", "Price")
+print(arranged_merged_df)
+write.csv(arranged_merged_df, file = "ScrapedAmazonData.csv", row.names = FALSE)
+```
